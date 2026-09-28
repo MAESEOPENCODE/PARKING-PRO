@@ -1,0 +1,17 @@
+{
+  "name": "¿Dónde aparqué? - Hyundai ix35",
+  "short_name": "Aparqué",
+  "description": "Guarda y localiza dónde has aparcado tu Hyundai ix35, con GPS en tiempo real, mapa táctil y foto del sitio.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B0F14",
+  "theme_color": "#0B0F14",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
