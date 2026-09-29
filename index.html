@@ -63,6 +63,7 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Ro
 .ic img{width:70%;height:70%;border-radius:8px}
 .ic.on{border-color:#FFB454}
 .ci{display:flex;font-size:16px}.ci img{width:18px;height:18px;border-radius:5px}.focusChip{width:22px;height:16px;align-items:center}.focusChip svg{width:22px;height:14px}
+.carTip{font-weight:800;border:0;border-radius:10px;padding:5px 9px;background:rgba(10,16,24,.92);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.28)}
 .car3d .ico{position:absolute;left:0;top:0;width:56px;height:56px;border-radius:14px;background:#0d131b;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:32px;filter:drop-shadow(0 10px 5px rgba(0,0,0,.5));animation:fl 2.4s ease-in-out infinite}.focusCar{padding:3px}.focusSvg{width:54px;height:40px;display:block}
 .me{width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 0 rgba(59,130,246,.6);animation:mp 2s infinite}
 @keyframes mp{to{box-shadow:0 0 0 22px rgba(59,130,246,0)}}
@@ -157,14 +158,33 @@ const fmtD=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(2)+' km';
 const ago=t=>{const m=Math.round((Date.now()-t)/60000);return m<1?'ahora mismo':m<60?'hace '+m+' min':new Date(t).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})};
 async function addr(lat,lng){try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);const d=await r.json(),a=d.address||{};return [a.road,a.house_number,a.suburb||a.city_district,a.city||a.town||a.village].filter(Boolean).join(', ')||d.display_name||''}catch(e){return ''}}
 
+const carLayer=L.layerGroup().addTo(map);
 let carMs=[];
 function drawCar(){
-  carMs.forEach(x=>map.removeLayer(x));carMs=[];
+  // Elimina cualquier marcador de coche creado por esta versión antes de redibujar.
+  carLayer.clearLayers();
+  carMs=[];
+  // El coche activo siempre se obtiene de cars[act], evitando reutilizar datos del coche anterior.
+  const active=cars[act];
   cars.forEach((c,i)=>{
     if(!c.spot)return;
-    const on=i===act,mk=L.marker([c.spot.lat,c.spot.lng],{icon:carIcon(c,on),draggable:on,zIndexOffset:on?500:0}).addTo(map);
-    if(on)mk.on('dragend',e=>{const p=e.target.getLatLng();spot.lat=p.lat;spot.lng=p.lng;spot.addr=null;save();render();toast('Posición del coche ajustada')});
-    else mk.on('click',()=>switchCar(i));
+    const on=i===act;
+    const mk=L.marker([c.spot.lat,c.spot.lng],{
+      icon:carIcon(c,on),
+      draggable:on,
+      zIndexOffset:on?1000:0,
+      autoPanOnFocus:false
+    }).addTo(carLayer);
+    if(on){
+      mk.bindTooltip(esc(active.name),{permanent:false,direction:'top',offset:[0,-34],className:'carTip'});
+      mk.on('dragend',e=>{
+        const p=e.target.getLatLng();
+        spot.lat=p.lat;spot.lng=p.lng;spot.addr=null;
+        // Mantener el marcador asociado al coche activo.
+        cars[act].spot=spot;
+        save();drawCar();render();toast('Posición del coche ajustada');
+      });
+    }else mk.on('click',()=>switchCar(i));
     carMs.push(mk);
   });
 }
