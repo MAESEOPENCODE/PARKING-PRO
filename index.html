@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="app-ver" content="v7">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>¿Dónde aparqué?</title>
 <link rel="manifest" href="manifest.json">
@@ -64,6 +65,8 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Ro
 .ic.on{border-color:#FFB454}
 .ci{display:flex;font-size:16px}.ci img{width:18px;height:18px;border-radius:5px}
 .car3d .ico{position:absolute;left:0;top:0;width:56px;height:56px;border-radius:14px;background:#0d131b;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:32px;filter:drop-shadow(0 10px 5px rgba(0,0,0,.5));animation:fl 2.4s ease-in-out infinite}
+.chip.ns{opacity:.6}
+#ver{text-align:center;font-size:10px;color:#5d6875;margin-top:8px}
 .me{width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 0 rgba(59,130,246,.6);animation:mp 2s infinite}
 @keyframes mp{to{box-shadow:0 0 0 22px rgba(59,130,246,0)}}
 </style>
@@ -96,6 +99,7 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Ro
     <button class="b" id="saveBtn" style="display:none;grid-column:1/-1">💾 Guardar</button>
   </div>
   <div id="hist"></div>
+  <div id="ver"></div>
   <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 </div>
 <div id="dlg"><div class="glass card">
@@ -174,7 +178,7 @@ function drawCar(){
 function renderCars(){
   const box=$('cars');box.innerHTML='';
   cars.forEach((c,i)=>{
-    const b=document.createElement('button'),sp=document.createElement('span');b.className='chip'+(i===act?' on':'');sp.className='ci';
+    const b=document.createElement('button'),sp=document.createElement('span');b.className='chip'+(i===act?' on':'')+(c.spot?'':' ns');b.title=c.spot?'':'Sin ubicación guardada';sp.className='ci';
     const ic=iconOf(c);if(isImg(ic)){const im=new Image();im.src=imgSrc(ic);sp.appendChild(im)}else sp.textContent=ic;
     b.appendChild(sp);b.appendChild(document.createTextNode(c.name));b.onclick=()=>{if(i!==act)switchCar(i)};box.appendChild(b);
   });
@@ -248,7 +252,7 @@ function setSpot(lat,lng){
   if(spot)hist.unshift(spot);
   spot={lat,lng,ts:Date.now(),photo:null,addr:null,note:typed!==prev?typed:''};
   $('note').value=spot.note;
-  save();drawCar();render();map.flyTo([lat,lng],Math.max(map.getZoom(),18));toast('Coche guardado');
+  save();drawCar();renderCars();render();map.flyTo([lat,lng],Math.max(map.getZoom(),18));toast('Coche guardado');
 }
 
 /* GPS */
@@ -314,6 +318,21 @@ $('searchForm').onsubmit=async e=>{
 };
 
 drawCar();renderCars();render();
+const VER=document.querySelector('meta[name=app-ver]').content;
+$('ver').textContent='Versión '+VER;
+async function checkVer(){
+  try{
+    const r=await fetch(location.pathname+'?_='+Date.now(),{cache:'no-store'});
+    const mm=(await r.text()).match(/name="app-ver" content="([^"]+)"/);
+    if(!mm||mm[1]===VER||sessionStorage.getItem('upd')===mm[1])return;
+    sessionStorage.setItem('upd',mm[1]);
+    if(navigator.serviceWorker){const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(x=>x.update().catch(()=>{})))}
+    if(window.caches){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
+    location.reload();
+  }catch(e){}
+}
+checkVer();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkVer()});
 if('serviceWorker' in navigator){
   let had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload();had=true});

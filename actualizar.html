@@ -1,0 +1,9 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Actualizando…</title></head>
+<body style="font-family:system-ui,sans-serif;background:#0b0f16;color:#e7ecf2;text-align:center;padding:48px 20px"><p id="m">Actualizando…</p>
+<script>
+(async()=>{
+  try{const rs=await navigator.serviceWorker.getRegistrations();await Promise.all(rs.map(r=>r.unregister()));const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}catch(e){}
+  document.getElementById('m').textContent='Listo. Abriendo la app…';
+  setTimeout(()=>location.replace('./?v='+Date.now()),500);
+})();
+</script></body></html>
