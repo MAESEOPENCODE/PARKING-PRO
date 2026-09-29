@@ -55,6 +55,15 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Ro
 .chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .car3d.sm{transform:scale(.72);transform-origin:50% 100%;opacity:.9}
 .lbl{position:absolute;left:50%;top:-16px;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:800;background:#111823;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:2px 7px}
+#dlg{position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center}
+#dlg .card{width:min(92%,400px);border-radius:20px;padding:16px}
+#dlg h3{margin:0 0 4px;font-size:17px}
+#dlgIcons{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
+.ic{aspect-ratio:1;border-radius:12px;border:2px solid transparent;background:rgba(0,0,0,.3);font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:inherit}
+.ic img{width:70%;height:70%;border-radius:8px}
+.ic.on{border-color:#FFB454}
+.ci{display:flex;font-size:16px}.ci img{width:18px;height:18px;border-radius:5px}.focusChip{width:22px;height:16px;align-items:center}.focusChip svg{width:22px;height:14px}
+.car3d .ico{position:absolute;left:0;top:0;width:56px;height:56px;border-radius:14px;background:#0d131b;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:32px;filter:drop-shadow(0 10px 5px rgba(0,0,0,.5));animation:fl 2.4s ease-in-out infinite}.focusCar{padding:3px}.focusSvg{width:54px;height:40px;display:block}
 .me{width:18px;height:18px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 0 rgba(59,130,246,.6);animation:mp 2s infinite}
 @keyframes mp{to{box-shadow:0 0 0 22px rgba(59,130,246,0)}}
 </style>
@@ -89,6 +98,12 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Ro
   <div id="hist"></div>
   <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 </div>
+<div id="dlg"><div class="glass card">
+  <h3 id="dlgT"></h3>
+  <input class="note" id="dlgName" maxlength="20" placeholder="Nombre del coche" autocomplete="off">
+  <div id="dlgIcons"></div>
+  <div class="btns"><button type="button" class="b" id="dlgNo">Cancelar</button><button type="button" class="b" id="dlgOk" style="background:#FFB454;color:#241706;box-shadow:0 4px 0 #a86f22">Guardar</button></div>
+</div></div>
 <div class="toast" id="toast"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
@@ -116,7 +131,8 @@ $('satBtn').onclick=()=>{isSat=!isSat;if(isSat){map.removeLayer(street);sat.addT
 $('followBtn').onclick=()=>{follow=!follow;$('followBtn').classList.toggle('on',follow);if(follow&&here)map.flyTo([here.lat,here.lng],Math.max(map.getZoom(),17))};
 map.on('dragstart',()=>{follow=false;$('followBtn').classList.remove('on')});
 
-const carIcon=(c,on)=>L.divIcon({className:'',html:`<div class="car3d${on?'':' sm'}"><div class="g" style="background:radial-gradient(${c.color}b3,transparent 70%)"></div><img src="${ICON}"><div class="lbl">${esc(c.name)}</div></div>`,iconSize:[56,56],iconAnchor:[28,44]});
+const focusSvg=()=>`<svg class="focusSvg" viewBox="0 0 120 70" aria-label="Ford Focus gris"><defs><linearGradient id="fg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfc5cc"/><stop offset=".52" stop-color="#737b84"/><stop offset="1" stop-color="#424950"/></linearGradient><linearGradient id="fw" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eef2f5"/><stop offset="1" stop-color="#8f98a2"/></linearGradient></defs><ellipse cx="60" cy="61" rx="48" ry="5" fill="#111820" opacity=".55"/><path d="M13 49c2-11 8-18 20-21l10-12c3-4 7-6 13-6h18c7 0 12 3 16 9l7 10c7 2 11 8 12 18v7H12z" fill="url(#fg)" stroke="#d9dde2" stroke-width="1.5"/><path d="M39 17h18l10 14H28l8-11c1-2 2-3 3-3z" fill="#26313b" stroke="#9da6af" stroke-width="1"/><path d="M69 17h6c5 0 8 2 11 7l4 7H72z" fill="#1d2730"/><path d="M17 42h88" stroke="#e0e4e8" stroke-opacity=".35"/><path d="M16 49h12M92 49h12" stroke="#fff" stroke-opacity=".65" stroke-width="2"/><circle cx="30" cy="53" r="9" fill="#151b21" stroke="#aeb5bd" stroke-width="2"/><circle cx="92" cy="53" r="9" fill="#151b21" stroke="#aeb5bd" stroke-width="2"/><circle cx="30" cy="53" r="4" fill="url(#fw)"/><circle cx="92" cy="53" r="4" fill="url(#fw)"/><path d="M43 42h34l-3 7H46z" fill="#202930"/><path d="M49 45h22" stroke="#c8ced4" stroke-width="1.5"/><path d="M20 39l5-5M100 39l-5-5" stroke="#fff" stroke-opacity=".75" stroke-width="2"/></svg>`;
+const carIcon=(c,on)=>L.divIcon({className:'',html:`<div class="car3d${on?'':' sm'}"><div class="g" style="background:radial-gradient(${c.color}b3,transparent 70%)"></div>${c.icon==='focus-gray'?`<div class="ico focusCar">${focusSvg()}</div>`:c.icon?`<div class="ico">${c.icon}</div>`:`<img src="${ICON}">`}<div class="lbl">${esc(c.name)}</div></div>`,iconSize:[56,56],iconAnchor:[28,44]});
 const meIcon=L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[18,18],iconAnchor:[9,9]});
 
 const dist=(a,b)=>{const R=6371000,r=x=>x*Math.PI/180,s=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 2*R*Math.atan2(Math.sqrt(s),Math.sqrt(1-s))};
@@ -154,7 +170,11 @@ function drawCar(){
 }
 function renderCars(){
   const box=$('cars');box.innerHTML='';
-  cars.forEach((c,i)=>{const b=document.createElement('button');b.className='chip'+(i===act?' on':'');b.innerHTML=`<i style="background:${c.color}"></i>${esc(c.name)}`;b.onclick=()=>{if(i!==act)switchCar(i)};box.appendChild(b)});
+  cars.forEach((c,i)=>{
+    const b=document.createElement('button'),sp=document.createElement('span');b.className='chip'+(i===act?' on':'');sp.className='ci';
+    if(c.icon==='focus-gray'){sp.innerHTML=focusSvg();sp.className='ci focusChip'}else if(c.icon)sp.textContent=c.icon;else{const im=new Image();im.src=ICON;sp.appendChild(im)}
+    b.appendChild(sp);b.appendChild(document.createTextNode(c.name));b.onclick=()=>{if(i!==act)switchCar(i)};box.appendChild(b);
+  });
   const add=(t,f,lb)=>{const b=document.createElement('button');b.className='chip';b.textContent=t;b.setAttribute('aria-label',lb);b.onclick=f;box.appendChild(b)};
   add('＋',addCar,'Añadir coche');add('✏️',renameCar,'Renombrar coche');if(cars.length>1)add('🗑️',delCar,'Eliminar coche');
 }
@@ -167,14 +187,29 @@ function loadCar(i){
   if(spot)map.flyTo([spot.lat,spot.lng],Math.max(map.getZoom(),17));
 }
 function switchCar(i){save();loadCar(i)}
+const ICONS=['','focus-gray','🚙','🚗','🛻','🚐','🚚','🏍️','🛵','🚲','🚕','🚌','🚜'];
+let dlgCb=null,dlgIcon='';
+function openDlg(title,name,icon,cb){
+  $('dlgT').textContent=title;$('dlgName').value=name;dlgIcon=icon||'';dlgCb=cb;
+  const g=$('dlgIcons');g.innerHTML='';
+  ICONS.forEach(ic=>{
+    const b=document.createElement('button');b.type='button';b.className='ic'+(ic===dlgIcon?' on':'');
+    if(ic==='focus-gray'){b.innerHTML=focusSvg();}else if(ic)b.textContent=ic;else{const im=new Image();im.src=ICON;b.appendChild(im)}
+    b.onclick=()=>{dlgIcon=ic;[...g.children].forEach(x=>x.classList.remove('on'));b.classList.add('on')};g.appendChild(b);
+  });
+  $('dlg').style.display='flex';setTimeout(()=>$('dlgName').focus(),60);
+}
+$('dlgNo').onclick=()=>{$('dlg').style.display='none'};
+$('dlgOk').onclick=()=>{const n=$('dlgName').value.trim().slice(0,20);if(!n){toast('Escribe un nombre');return}$('dlg').style.display='none';if(dlgCb)dlgCb(n,dlgIcon)};
+$('dlgName').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('dlgOk').click()}};
 function addCar(){
-  const n=prompt('Nombre del coche (ej. Seat Ibiza)','Coche '+(cars.length+1));if(n===null)return;
-  save();cars.push({name:n.trim().slice(0,20)||'Coche '+(cars.length+1),color:COLORS[cars.length%COLORS.length],spot:null,hist:[]});
-  loadCar(cars.length-1);save();toast('Coche añadido: marca dónde lo has dejado');
+  openDlg('Nuevo coche','Coche '+(cars.length+1),'',(n,ic)=>{
+    save();cars.push({name:n,icon:ic,color:COLORS[cars.length%COLORS.length],spot:null,hist:[]});
+    loadCar(cars.length-1);save();toast('Coche añadido: marca dónde lo has dejado');
+  });
 }
 function renameCar(){
-  const n=prompt('Nuevo nombre',cn());if(n===null||!n.trim())return;
-  cars[act].name=n.trim().slice(0,20);save();drawCar();renderCars();render();
+  openDlg('Editar coche',cn(),cars[act].icon||'',(n,ic)=>{cars[act].name=n;cars[act].icon=ic;save();drawCar();renderCars();render()});
 }
 function delCar(){
   if(cars.length<2)return;
