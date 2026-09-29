@@ -76,6 +76,7 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Ro
     <button class="b" id="photoBtn">📷 Foto del sitio</button>
     <button class="b" id="goBtn" style="display:none">🚶 Cómo llegar</button>
     <button class="b" id="histBtn">🕘 Historial</button>
+    <button class="b" id="saveBtn" style="display:none;grid-column:1/-1">💾 Guardar</button>
   </div>
   <div id="hist"></div>
   <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
@@ -102,6 +103,23 @@ const carIcon=L.divIcon({className:'',html:`<div class="car3d"><div class="g"></
 const meIcon=L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[18,18],iconAnchor:[9,9]});
 
 const dist=(a,b)=>{const R=6371000,r=x=>x*Math.PI/180,s=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 2*R*Math.atan2(Math.sqrt(s),Math.sqrt(1-s))};
+let route=null,routeBusy=false,rk='',rfrom=null,rfail=false;
+async function fetchRoute(){
+  if(!spot||!here||routeBusy)return;
+  const k=spot.lat+','+spot.lng;
+  if(rk===k&&rfrom&&dist(rfrom,here)<25)return;
+  routeBusy=true;rk=k;rfrom={lat:here.lat,lng:here.lng};
+  const from=rfrom;
+  try{
+    const r=await fetch(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${from.lng},${from.lat};${spot.lng},${spot.lat}?overview=full&geometries=geojson`);
+    const d=await r.json();
+    if(d.code==='Ok'&&d.routes&&d.routes[0]){const x=d.routes[0];route={k,d:x.distance,t:x.duration,pts:x.geometry.coordinates.map(c=>[c[1],c[0]])};rfail=false}
+    else{rfail=true;if(route&&route.k!==k)route=null}
+  }catch(e){rfail=true;if(route&&route.k!==k)route=null}
+  routeBusy=false;
+  if(spot&&here&&spot.lat+','+spot.lng===k)render();
+}
+const okRoute=()=>route&&spot&&route.k===spot.lat+','+spot.lng;
 const fmtD=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(2)+' km';
 const ago=t=>{const m=Math.round((Date.now()-t)/60000);return m<1?'ahora mismo':m<60?'hace '+m+' min':new Date(t).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})};
 async function addr(lat,lng){try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);const d=await r.json(),a=d.address||{};return [a.road,a.house_number,a.suburb||a.city_district,a.city||a.town||a.village].filter(Boolean).join(', ')||d.display_name||''}catch(e){return ''}}
@@ -114,19 +132,26 @@ function drawCar(){
 }
 async function render(){
   const has=!!spot;
-  $('goBtn').style.display=has?'block':'none';
+  $('goBtn').style.display=has?'block':'none';$('saveBtn').style.display=has?'block':'none';
   $('thumb').style.display=has&&spot.photo?'block':'none';if(has&&spot.photo)$('thumb').src=spot.photo;
   if(!has){$('title').textContent='Aún no has marcado tu ix35';$('sub').textContent='Pulsa “Aparcado aquí” o márcalo en el mapa.';$('dist').innerHTML='';drawLine();return}
   $('title').textContent=spot.note||'Tu ix35 está aquí';
   if(document.activeElement!==$('note'))$('note').value=spot.note||'';
   $('sub').textContent=(spot.addr?spot.addr+' · ':'')+'guardado '+ago(spot.ts);
   if(spot.addr===undefined||spot.addr===null){spot.addr='';addr(spot.lat,spot.lng).then(a=>{spot.addr=a;save();render()})}
-  if(here){const d=dist(here,spot);$('dist').innerHTML=fmtD(d)+`<small>≈ ${Math.max(1,Math.round(d/80))} min a pie</small>`}else $('dist').innerHTML='';
+  if(here){
+    fetchRoute();
+    if(okRoute())$('dist').innerHTML=fmtD(route.d)+`<small>≈ ${Math.max(1,Math.round(route.t/60))} min a pie</small>`;
+    else{const d=dist(here,spot);$('dist').innerHTML=fmtD(d)+`<small>${rfail?'sin ruta · línea recta':'calculando ruta…'}</small>`}
+  }else $('dist').innerHTML='';
   drawLine();
 }
 function drawLine(){
   if(line){map.removeLayer(line);line=null}
-  if(spot&&here)line=L.polyline([[here.lat,here.lng],[spot.lat,spot.lng]],{color:'#FFB454',weight:4,dashArray:'2 10',lineCap:'round'}).addTo(map);
+  if(spot&&here){
+    const pts=okRoute()?[[here.lat,here.lng],...route.pts]:[[here.lat,here.lng],[spot.lat,spot.lng]];
+    line=L.polyline(pts,{color:'#FFB454',weight:4,dashArray:'2 10',lineCap:'round',lineJoin:'round'}).addTo(map);
+  }
 }
 function setSpot(lat,lng){
   const prev=spot?(spot.note||''):'',typed=$('note').value.trim();
@@ -170,6 +195,15 @@ $('pickBtn').onclick=()=>{
 };
 $('note').oninput=()=>{if(!spot)return;spot.note=$('note').value.trim();save();$('title').textContent=spot.note||'Tu ix35 está aquí'};
 $('goBtn').onclick=()=>{if(spot)window.open(`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}&travelmode=walking`,'_blank')};
+$('saveBtn').onclick=()=>{
+  if(!spot){toast('Primero marca dónde está el coche');return}
+  spot.note=$('note').value.trim();spot.ts=Date.now();save();render();
+  let ok=false;
+  try{const g=JSON.parse(localStorage.getItem('da_spot')||'null');ok=!!g&&g.lat===spot.lat&&g.lng===spot.lng&&(g.note||'')===(spot.note||'')}catch(e){}
+  const b=$('saveBtn');
+  if(ok){toast(`✓ Guardado: ${spot.lat.toFixed(5)}, ${spot.lng.toFixed(5)}${spot.addr?' · '+spot.addr:''}${spot.note?' · “'+spot.note+'”':''}${spot.photo?' · con foto':''}`);b.textContent='✅ Guardado';setTimeout(()=>b.textContent='💾 Guardar',2000)}
+  else toast('⚠️ No se pudo guardar. Revisa el espacio o los permisos del navegador');
+};
 $('thumb').onclick=()=>map.flyTo([spot.lat,spot.lng],19);
 $('photoBtn').onclick=()=>{if(!spot){toast('Primero marca dónde está el coche');return}$('photoInput').click()};
 $('photoInput').onchange=e=>{
@@ -190,7 +224,11 @@ $('searchForm').onsubmit=async e=>{
 };
 
 drawCar();render();
-if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if('serviceWorker' in navigator){
+  let had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload();had=true});
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{}));
+}
 </script>
 </body>
 </html>
